@@ -6,6 +6,15 @@ export default {
     orders: '注文',
     finance: '財務',
     demandForecast: '需要予測',
+    restocking: '補充発注',
+    reports: 'レポート',
+    groupOverview: '概要',
+    groupOperations: '運用',
+    groupFinance: '財務',
+    mainNavigation: 'メインナビゲーション',
+    collapseSidebar: 'サイドバーを折りたたむ',
+    expandSidebar: 'サイドバーを展開',
+    openMenu: 'メニューを開く',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
@@ -112,6 +121,12 @@ export default {
     onTimeDelivery: '定時配達',
     itemsCount: '{count}件',
     quantity: '数量',
+    submittedOrders: '発注済み注文',
+    noSubmittedOrders: '補充発注はまだ送信されていません。',
+    leadTime: 'リードタイム',
+    leadTimeDays: '{count}日',
+    submittedDate: '送信日',
+    estimatedDelivery: '配達予定日',
     table: {
       orderNumber: '注文番号',
       orderId: '注文ID',
@@ -185,6 +200,34 @@ export default {
       change: '変化',
       trend: 'トレンド',
       period: '期間'
+    }
+  },
+
+  // Restocking
+  restocking: {
+    title: '補充発注',
+    description: '予算を設定し、需要予測に基づいて在庫を補充します',
+    budget: '利用可能な予算',
+    budgetHelp: 'スライダーで使用可能な金額を設定してください。',
+    recommendedItems: '推奨アイテム',
+    noRecommendations: 'この予算で推奨できるアイテムはありません。',
+    orderTotal: '注文合計',
+    remainingBudget: '残りの予算',
+    longestLeadTime: '最長リードタイム',
+    placeOrder: '注文する',
+    placing: '注文を送信中...',
+    orderPlaced: '注文 {number} を送信しました。配達予定は{days}日後です。',
+    viewOrders: '注文を表示',
+    overBudget: '注文合計が予算を超えています。',
+    failed: '注文に失敗しました: ',
+    table: {
+      sku: 'SKU',
+      itemName: '商品名',
+      growth: '予測成長率',
+      unitCost: '単価',
+      quantity: '数量',
+      lineCost: '小計',
+      leadTime: 'リードタイム'
     }
   },
 
@@ -302,6 +345,31 @@ export default {
     dueDate: '期限',
     addTask: 'タスクを追加',
     noTasks: 'タスクがありません。上記からタスクを追加してください！'
+  },
+
+  // Purchase Order Modal
+  purchaseOrder: {
+    createTitle: '発注書を作成',
+    viewTitle: '発注書',
+    sku: 'SKU',
+    item: '品目',
+    shortage: '不足数',
+    supplierName: '仕入先名',
+    supplierPlaceholder: '仕入先名を入力...',
+    quantity: '数量',
+    unitCost: '単価',
+    expectedDelivery: '納品予定日',
+    notes: '備考（任意）',
+    notesPlaceholder: 'この発注に関する備考を入力...',
+    submit: '発注書を作成',
+    submitting: '作成中...',
+    poId: '発注書ID',
+    totalCost: '合計金額',
+    status: 'ステータス',
+    createdDate: '作成日',
+    noNotes: 'なし',
+    loadError: '発注書の読み込みに失敗しました',
+    createError: '発注書の作成に失敗しました'
   },
 
   // Language

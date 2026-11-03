@@ -1,8 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from pydantic import BaseModel
-from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from datetime import datetime, timedelta
+from typing import Literal
+import itertools
+import re
+import threading
+from pydantic import BaseModel, Field
+from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders, tasks as seed_tasks
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -89,6 +94,9 @@ class DemandForecast(BaseModel):
     forecasted_demand: int
     trend: str
     period: str
+    unit_cost: float
+    lead_time_days: int
+    current_stock: int
 
 class BacklogItem(BaseModel):
     id: str
@@ -114,11 +122,72 @@ class PurchaseOrder(BaseModel):
 
 class CreatePurchaseOrderRequest(BaseModel):
     backlog_item_id: str
-    supplier_name: str
+    supplier_name: str = Field(min_length=1)
+    quantity: int = Field(gt=0)
+    unit_cost: float = Field(gt=0)
+    expected_delivery_date: str  # YYYY-MM-DD, validated in the endpoint
+    notes: Optional[str] = None
+
+# Field names are camelCase (dueDate) on purpose: the frontend's existing task shape
+# (see useAuth.js mock tasks and TasksModal.vue) uses `dueDate`, so the API matches it.
+class Task(BaseModel):
+    id: str
+    title: str
+    priority: Literal['high', 'medium', 'low']
+    dueDate: str
+    status: Literal['pending', 'completed'] = 'pending'
+
+class CreateTaskRequest(BaseModel):
+    title: str = Field(min_length=1)
+    priority: Literal['high', 'medium', 'low'] = 'medium'
+    dueDate: str  # YYYY-MM-DD, validated in the endpoint
+
+class RestockLine(BaseModel):
+    sku: str
+    quantity: int
+
+class RestockOrderItem(BaseModel):
+    sku: str
+    name: str
     quantity: int
     unit_cost: float
-    expected_delivery_date: str
-    notes: Optional[str] = None
+    line_cost: float
+    lead_time_days: int
+
+class CreateRestockOrderRequest(BaseModel):
+    budget: float
+    items: List[RestockLine]
+
+class RestockOrder(BaseModel):
+    id: str
+    order_number: str
+    status: str
+    budget: float
+    items: List[RestockOrderItem]
+    total_cost: float
+    lead_time_days: int
+    submitted_date: str
+    estimated_delivery: str
+
+# In-memory store for submitted restocking orders (reset on server restart, like all data here)
+restock_orders: List[dict] = []
+
+# In-memory task store, seeded from data/tasks.json (copies, so the loaded data is never mutated).
+# Ids are "task-N" strings so they can never collide with the integer ids of the frontend's mock tasks.
+tasks_store: List[dict] = [dict(t) for t in seed_tasks]
+_task_ids = itertools.count(len(tasks_store) + 1)
+_purchase_order_lock = threading.Lock()
+
+def parse_iso_date(value: str, field_name: str) -> None:
+    """Raise a 400 if value is not a valid, zero-padded YYYY-MM-DD date."""
+    try:
+        # strptime alone also accepts unpadded values like "2025-1-5", which browsers parse
+        # inconsistently in `new Date(...)`; the regex enforces the documented ISO shape.
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError(value)
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a valid date in YYYY-MM-DD format")
 
 # API endpoints
 @app.get("/")
@@ -166,6 +235,105 @@ def get_demand_forecasts():
     """Get demand forecasts"""
     return demand_forecasts
 
+@app.get("/api/restock/recommendations")
+def get_restock_recommendations(budget: float = 0):
+    """Recommend forecast items to restock within a budget.
+
+    Items are ranked by forecast growth (forecasted vs current demand). Each item's
+    shortfall is forecasted_demand - current_stock; items with no shortfall are skipped.
+    We fill greedily in rank order, capping quantity at what the remaining budget affords.
+    """
+    if budget < 0:
+        raise HTTPException(status_code=422, detail="Budget must not be negative")
+
+    candidates = []
+    for f in demand_forecasts:
+        shortfall = f["forecasted_demand"] - f["current_stock"]
+        if shortfall > 0:
+            growth = (f["forecasted_demand"] - f["current_demand"]) / f["current_demand"]
+            candidates.append((growth, shortfall, f))
+    # Highest growth first; larger shortfall breaks ties
+    candidates.sort(key=lambda c: (c[0], c[1]), reverse=True)
+
+    remaining = budget
+    items = []
+    for growth, shortfall, f in candidates:
+        # int() guards against float error when budget divides evenly by unit cost
+        affordable = int((remaining + 1e-9) // f["unit_cost"])
+        quantity = min(shortfall, affordable)
+        if quantity <= 0:
+            continue
+        line_cost = round(quantity * f["unit_cost"], 2)
+        remaining -= line_cost
+        items.append({
+            "sku": f["item_sku"],
+            "name": f["item_name"],
+            "quantity": quantity,
+            "max_quantity": shortfall,
+            "unit_cost": f["unit_cost"],
+            "line_cost": line_cost,
+            "lead_time_days": f["lead_time_days"],
+            "growth_percent": round(growth * 100, 1),
+            "trend": f["trend"],
+        })
+
+    total_cost = round(sum(i["line_cost"] for i in items), 2)
+    return {
+        "budget": budget,
+        "items": items,
+        "total_cost": total_cost,
+        "remaining_budget": round(budget - total_cost, 2),
+    }
+
+@app.post("/api/restock-orders", response_model=RestockOrder)
+def create_restock_order(request: CreateRestockOrderRequest):
+    """Submit a restocking order. Lead time is the longest lead time of any line."""
+    if not request.items:
+        raise HTTPException(status_code=422, detail="Order must contain at least one item")
+
+    by_sku = {f["item_sku"]: f for f in demand_forecasts}
+    lines = []
+    for line in request.items:
+        forecast = by_sku.get(line.sku)
+        if not forecast:
+            raise HTTPException(status_code=404, detail=f"Unknown SKU: {line.sku}")
+        if line.quantity <= 0:
+            raise HTTPException(status_code=422, detail=f"Quantity must be positive for {line.sku}")
+        lines.append({
+            "sku": line.sku,
+            "name": forecast["item_name"],
+            "quantity": line.quantity,
+            "unit_cost": forecast["unit_cost"],
+            "line_cost": round(line.quantity * forecast["unit_cost"], 2),
+            "lead_time_days": forecast["lead_time_days"],
+        })
+
+    total_cost = round(sum(l["line_cost"] for l in lines), 2)
+    if total_cost > request.budget:
+        raise HTTPException(status_code=422, detail="Order total exceeds budget")
+
+    lead_time = max(l["lead_time_days"] for l in lines)
+    now = datetime.now()
+    number = len(restock_orders) + 1
+    order = {
+        "id": f"RST-{number:04d}",
+        "order_number": f"RST-{number:04d}",
+        "status": "Submitted",
+        "budget": request.budget,
+        "items": lines,
+        "total_cost": total_cost,
+        "lead_time_days": lead_time,
+        "submitted_date": now.isoformat(timespec="seconds"),
+        "estimated_delivery": (now + timedelta(days=lead_time)).isoformat(timespec="seconds"),
+    }
+    restock_orders.append(order)
+    return order
+
+@app.get("/api/restock-orders", response_model=List[RestockOrder])
+def get_restock_orders():
+    """Get submitted restocking orders, newest first"""
+    return list(reversed(restock_orders))
+
 @app.get("/api/backlog", response_model=List[BacklogItem])
 def get_backlog():
     """Get backlog items with purchase order status"""
@@ -178,6 +346,88 @@ def get_backlog():
         item_dict["has_purchase_order"] = has_po
         result.append(item_dict)
     return result
+
+@app.post("/api/purchase-orders", response_model=PurchaseOrder, status_code=201)
+def create_purchase_order(request: CreatePurchaseOrderRequest):
+    """Create a purchase order for a backlog item (one PO per backlog item)"""
+    if not request.supplier_name.strip():
+        raise HTTPException(status_code=400, detail="supplier_name must not be blank")
+    parse_iso_date(request.expected_delivery_date, "expected_delivery_date")
+
+    if not any(b["id"] == request.backlog_item_id for b in backlog_items):
+        raise HTTPException(status_code=404, detail=f"Backlog item {request.backlog_item_id} not found")
+    now = datetime.now()
+    # Sync endpoints run in a threadpool, so the duplicate check, id assignment and append must be
+    # one atomic step; otherwise two concurrent requests could both pass the check (two POs for one
+    # backlog item) or compute the same id from len(purchase_orders).
+    with _purchase_order_lock:
+        if any(po["backlog_item_id"] == request.backlog_item_id for po in purchase_orders):
+            raise HTTPException(status_code=409, detail=f"Backlog item {request.backlog_item_id} already has a purchase order")
+
+        po = {
+            "id": f"PO-{now.year}-{len(purchase_orders) + 1:04d}",
+            "backlog_item_id": request.backlog_item_id,
+            "supplier_name": request.supplier_name.strip(),
+            "quantity": request.quantity,
+            "unit_cost": request.unit_cost,
+            "expected_delivery_date": request.expected_delivery_date,
+            "status": "Pending",
+            "created_date": now.strftime("%Y-%m-%d"),
+            "notes": request.notes,
+        }
+        # Deliberately appended to the shared list: get_backlog() derives has_purchase_order from it,
+        # so the new PO shows up there immediately. Like all data here it resets on server restart.
+        purchase_orders.append(po)
+    return po
+
+@app.get("/api/purchase-orders/{backlog_item_id}", response_model=PurchaseOrder)
+def get_purchase_order_by_backlog_item(backlog_item_id: str):
+    """Get the purchase order attached to a backlog item"""
+    for po in purchase_orders:
+        if po["backlog_item_id"] == backlog_item_id:
+            return po
+    raise HTTPException(status_code=404, detail=f"No purchase order found for backlog item {backlog_item_id}")
+
+@app.get("/api/tasks", response_model=List[Task])
+def get_tasks():
+    """Get tasks, newest first"""
+    return list(reversed(tasks_store))
+
+@app.post("/api/tasks", response_model=Task, status_code=201)
+def create_task(request: CreateTaskRequest):
+    """Create a task"""
+    title = request.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title must not be blank")
+    parse_iso_date(request.dueDate, "dueDate")
+
+    task = {
+        "id": f"task-{next(_task_ids)}",
+        "title": title,
+        "priority": request.priority,
+        "dueDate": request.dueDate,
+        "status": "pending",
+    }
+    tasks_store.append(task)
+    return task
+
+@app.patch("/api/tasks/{task_id}", response_model=Task)
+def toggle_task(task_id: str):
+    """Toggle a task between pending and completed"""
+    for task in tasks_store:
+        if task["id"] == task_id:
+            task["status"] = "completed" if task["status"] == "pending" else "pending"
+            return task
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task(task_id: str):
+    """Delete a task"""
+    for index, task in enumerate(tasks_store):
+        if task["id"] == task_id:
+            tasks_store.pop(index)
+            return {"message": f"Task {task_id} deleted"}
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary(
@@ -220,7 +470,16 @@ def get_monthly_spending():
 @app.get("/api/spending/categories")
 def get_category_spending():
     """Get spending by category"""
-    return category_spending
+    # `percentage` is derived from `amount` (share of the category total) rather than trusting
+    # the stored value: the hand-written percentages used to sum to ~124%, which made the
+    # "% of total" labels on the Finance page impossible. Work on copies, never mutate loaded data.
+    total = sum(c["amount"] for c in category_spending)
+    result = []
+    for c in category_spending:
+        item = dict(c)
+        item["percentage"] = round(item["amount"] / total * 100, 1) if total else 0.0
+        result.append(item)
+    return result
 
 @app.get("/api/spending/transactions")
 def get_recent_transactions():
