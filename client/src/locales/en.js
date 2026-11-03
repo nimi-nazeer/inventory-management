@@ -6,6 +6,15 @@ export default {
     orders: 'Orders',
     finance: 'Finance',
     demandForecast: 'Demand Forecast',
+    restocking: 'Restocking',
+    reports: 'Reports',
+    groupOverview: 'Overview',
+    groupOperations: 'Operations',
+    groupFinance: 'Finance',
+    mainNavigation: 'Main navigation',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
+    openMenu: 'Open menu',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },
@@ -112,6 +121,12 @@ export default {
     onTimeDelivery: 'On-Time Delivery',
     itemsCount: '{count} items',
     quantity: 'Qty',
+    submittedOrders: 'Submitted Orders',
+    noSubmittedOrders: 'No restocking orders have been submitted yet.',
+    leadTime: 'Lead Time',
+    leadTimeDays: '{count} days',
+    submittedDate: 'Submitted',
+    estimatedDelivery: 'Estimated Delivery',
     table: {
       orderNumber: 'Order Number',
       orderId: 'Order ID',
@@ -185,6 +200,34 @@ export default {
       change: 'Change',
       trend: 'Trend',
       period: 'Period'
+    }
+  },
+
+  // Restocking
+  restocking: {
+    title: 'Restocking',
+    description: 'Set a budget and restock items based on the demand forecast',
+    budget: 'Available Budget',
+    budgetHelp: 'Drag the slider to set how much you can spend.',
+    recommendedItems: 'Recommended Items',
+    noRecommendations: 'No items can be recommended for this budget.',
+    orderTotal: 'Order Total',
+    remainingBudget: 'Remaining Budget',
+    longestLeadTime: 'Longest Lead Time',
+    placeOrder: 'Place Order',
+    placing: 'Placing order...',
+    orderPlaced: 'Order {number} submitted. Estimated delivery in {days} days.',
+    viewOrders: 'View in Orders',
+    overBudget: 'Order total exceeds the budget.',
+    failed: 'Failed to place order: ',
+    table: {
+      sku: 'SKU',
+      itemName: 'Item Name',
+      growth: 'Forecast Growth',
+      unitCost: 'Unit Cost',
+      quantity: 'Quantity',
+      lineCost: 'Line Cost',
+      leadTime: 'Lead Time'
     }
   },
 
@@ -302,6 +345,31 @@ export default {
     dueDate: 'Due Date',
     addTask: 'Add Task',
     noTasks: 'No tasks yet. Add your first task above!'
+  },
+
+  // Purchase Order Modal
+  purchaseOrder: {
+    createTitle: 'Create Purchase Order',
+    viewTitle: 'Purchase Order',
+    sku: 'SKU',
+    item: 'Item',
+    shortage: 'Shortage',
+    supplierName: 'Supplier Name',
+    supplierPlaceholder: 'Enter supplier name...',
+    quantity: 'Quantity',
+    unitCost: 'Unit Cost',
+    expectedDelivery: 'Expected Delivery Date',
+    notes: 'Notes (optional)',
+    notesPlaceholder: 'Add any notes for this order...',
+    submit: 'Create Purchase Order',
+    submitting: 'Creating...',
+    poId: 'PO ID',
+    totalCost: 'Total Cost',
+    status: 'Status',
+    createdDate: 'Created',
+    noNotes: 'None',
+    loadError: 'Failed to load purchase order',
+    createError: 'Failed to create purchase order'
   },
 
   // Language

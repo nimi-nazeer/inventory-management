@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: full-redesign-inventory-app
+expected_outcome: |
+  The client app has a left vertical sidebar with grouped nav links for all seven routes, a slim topbar, a shared design-token stylesheet, consistent card/page styling, an unchanged router/API/i18n behavior, and a successful build.
+context:
+  scaffold_script: place-files.sh

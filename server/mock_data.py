@@ -14,7 +14,9 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 def load_json_file(filename):
     """Load data from a JSON file in the data directory"""
     filepath = os.path.join(DATA_DIR, filename)
-    with open(filepath, 'r') as f:
+    # Explicit UTF-8: without it Windows falls back to cp1252 and non-ASCII characters
+    # in the data (e.g. the "±" in "Dual Output ±15V Power Supply") turn into "Â±".
+    with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 # Load all datasets from JSON files
@@ -34,6 +36,9 @@ recent_transactions = load_json_file('transactions.json')
 
 # Load purchase orders
 purchase_orders = load_json_file('purchase_orders.json')
+
+# Load tasks (starts empty; tasks created through the API live in memory only)
+tasks = load_json_file('tasks.json')
 
 # All data is now loaded from JSON files in the data/ directory
 # This allows for easier maintenance and updates of the sample data

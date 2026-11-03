@@ -1,7 +1,6 @@
 <template>
   <div class="reports">
     <div class="page-header">
-      <h2>Performance Reports</h2>
       <p>View quarterly performance metrics and monthly trends</p>
     </div>
 
@@ -142,38 +141,29 @@ export default {
     }
   },
   mounted() {
-    console.log('Reports component mounted')
     this.loadData()
   },
   methods: {
     async loadData() {
-      console.log('Loading reports data...')
       try {
         this.loading = true
 
         // Fetch quarterly data
-        console.log('Fetching quarterly data...')
         const quarterlyResponse = await axios.get('http://localhost:8001/api/reports/quarterly')
         this.quarterlyData = quarterlyResponse.data
-        console.log('Quarterly data:', this.quarterlyData)
 
         // Fetch monthly data
-        console.log('Fetching monthly data...')
         const monthlyResponse = await axios.get('http://localhost:8001/api/reports/monthly-trends')
         this.monthlyData = monthlyResponse.data
-        console.log('Monthly data:', this.monthlyData)
 
         // Calculate summary stats
-        console.log('Calculating summary stats...')
         this.calculateSummaryStats()
-        console.log('Summary stats calculated')
 
       } catch (err) {
-        console.log('Error loading reports:', err)
+        console.error('Error loading reports:', err)
         this.error = 'Failed to load reports: ' + err.message
       } finally {
         this.loading = false
-        console.log('Loading complete')
       }
     },
 
@@ -212,7 +202,6 @@ export default {
     },
 
     formatNumber(num) {
-      console.log('Formatting number:', num)
       // Format number with commas
       var str = num.toString()
       var parts = str.split('.')
@@ -240,7 +229,6 @@ export default {
     },
 
     formatMonth(monthStr) {
-      console.log('Formatting month:', monthStr)
       // Convert YYYY-MM to readable format
       var parts = monthStr.split('-')
       var year = parts[0]
@@ -253,7 +241,6 @@ export default {
     },
 
     getBarHeight(revenue) {
-      console.log('Calculating bar height for revenue:', revenue)
       // Calculate bar height (max height 200px)
       var maxRevenue = 0
       for (var i = 0; i < this.monthlyData.length; i++) {
@@ -322,21 +309,21 @@ export default {
 }
 
 .card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
 .card-title {
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text);
   margin: 0;
 }
 
@@ -346,25 +333,25 @@ export default {
 }
 
 .reports-table th {
-  background: #f8fafc;
-  padding: 0.75rem;
+  background: var(--bg);
+  padding: var(--space-3);
   text-align: left;
   font-weight: 600;
-  color: #64748b;
-  border-bottom: 2px solid #e2e8f0;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
 }
 
 .reports-table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
 }
 
 .reports-table tr:hover {
-  background: #f8fafc;
+  background: var(--bg);
 }
 
 .chart-container {
-  padding: 2rem 1rem;
+  padding: var(--space-7) var(--space-4);
   min-height: 300px;
 }
 
@@ -373,7 +360,7 @@ export default {
   align-items: flex-end;
   justify-content: space-around;
   height: 250px;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .bar-wrapper {
@@ -400,50 +387,50 @@ export default {
 }
 
 .bar:hover {
-  background: linear-gradient(to top, #2563eb, #3b82f6);
+  background: linear-gradient(to top, var(--primary), #3b82f6);
 }
 
 .bar-label {
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: #64748b;
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   text-align: center;
   transform: rotate(-45deg);
   white-space: nowrap;
-  margin-top: 1.5rem;
+  margin-top: var(--space-6);
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
 }
 
 .stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border-left: 4px solid #3b82f6;
 }
 
 .stat-label {
-  font-size: 0.875rem;
-  color: #64748b;
-  margin-bottom: 0.5rem;
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
 }
 
 .stat-value {
-  font-size: 1.875rem;
+  font-size: var(--text-3xl);
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .badge {
-  padding: 0.25rem 0.75rem;
+  padding: var(--space-1) var(--space-3);
   border-radius: 9999px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
@@ -454,12 +441,12 @@ export default {
 
 .badge.warning {
   background: #fef3c7;
-  color: #92400e;
+  color: var(--warning-text);
 }
 
 .badge.danger {
   background: #fee2e2;
-  color: #991b1b;
+  color: var(--danger-text);
 }
 
 .positive-change {
@@ -468,21 +455,21 @@ export default {
 }
 
 .negative-change {
-  color: #dc2626;
+  color: var(--danger);
   font-weight: 600;
 }
 
 .loading {
   text-align: center;
-  padding: 3rem;
-  color: #64748b;
+  padding: var(--space-9);
+  color: var(--text-muted);
 }
 
 .error {
   background: #fee2e2;
-  color: #991b1b;
-  padding: 1rem;
-  border-radius: 8px;
-  margin: 1rem 0;
+  color: var(--danger-text);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin: var(--space-4) 0;
 }
 </style>
